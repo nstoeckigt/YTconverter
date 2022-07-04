@@ -1,6 +1,6 @@
 #!/bin/env python3
 
-import os
+import os, sys
 import subprocess
 import asyncio
 from loguru import logger
@@ -16,10 +16,16 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("audio2YouTube Converter")
+        #TODO: add NAG screen
+
+        self.title("audio2video Converter")
         self.resizable(False, False)
         self.geometry('560x340')
         self.option_add('*Dialog.msg.font', 'Helvetica 10')
+
+        self._audio_file = None
+        self._image_file = None
+        self._video_file = None
 
         self._audio_label = tk.Label(self, text="INPUT:  Audio File:", anchor=tk.W)
         self._audio_label.place(x=12, y=10, width=130, height=22)
@@ -61,24 +67,41 @@ class App(tk.Tk):
 
 
     def _checkFiles(self):
-        # TODO: Check all files if exists or path is valid
-        self._output_text['state'] = tk.NORMAL
-        self._output_text.insert(1.0, 'READY')
-        self._output_text.see("end")
-        self._output_text['state'] = tk.DISABLED
-        self._convert_button['state'] = tk.NORMAL
+        af_check = os.path.isfile(self._audio_file)
+        if_check = os.path.isfile(self._image_file)
+        vf_check = os.path.exists(os.path.dirname(self._video_file))
+
+        if af_check and if_check and af_check:
+            self._output_text['state'] = tk.NORMAL
+            self._output_text.insert(1.0, 'READY')
+            self._output_text.see("end")
+            self._output_text['state'] = tk.DISABLED
+            self._convert_button['state'] = tk.NORMAL
+        else:
+            if not af_check:
+                self._audio_text.config(bg='red')
+            if not if_check:
+                self._image_text.config(bg='red')
+            if not vf_check:
+                self._video_text.config(bg='red')
 
 
     def _getFile(self, title="Open Audio/Image"):
         if 'Audio' in title:
             filter = ("audio files", "*.wav *.mp3")
             dir = "~/Musik"
+            self._audio_text.config(bg='white')
             self._audio_file = filedialog.askopenfilename(initialdir=dir, title=title, filetypes=(filter, ))
+            if isinstance(self._audio_file, bytes):
+                self._audio_file = self._audio_file.decode('utf-8')
             self._audio_text.config(text=self._audio_file)
         elif 'Image' in title:
             filter = ("images", "*.jpg *.png *.gif")
             dir = "~/Bilder"
+            self._image_text.config(bg='white')
             self._image_file = filedialog.askopenfilename(initialdir=dir, title=title, filetypes=(filter, ))
+            if isinstance(self._image_file, bytes):
+                self._image_file = self._image_file.decode('utf-8')
             self._image_text.config(text=self._image_file)
         else:
             raise Exception("Invalid Filter")
@@ -86,7 +109,10 @@ class App(tk.Tk):
 
 
     def _setFile(self):
+        self._video_text.config(bg='white')
         self._video_file = filedialog.asksaveasfilename(initialdir="~/Videos", title="Save Video as", filetypes=(("mp4 video", "*.mp4"), ("all files", "*.*")))
+        if isinstance(self._video_file, bytes):
+            self._video_file = self._video_file.decode('utf-8')
         self._video_text.config(text=self._video_file)
         self._checkFiles()
 
@@ -108,12 +134,12 @@ class App(tk.Tk):
         self._output_text['state'] = tk.DISABLED
 
         # Execute Shell Command
-        #command_call = ('ffmpeg', '-loop 1', f'-i "{self._image_file}"', f'-i "{self._audio_file}"', '-c:a copy', '-c:v libx264', f'-shortest "{self._video_file}"')
+        #command_call = (f'ffmpeg -loop 1 -i "{self._image_file}" -i "{self._audio_file}" -c:a copy -c:v libx264 -shortest "{self._video_file}"'
 
         try:
             ff = ffmpy.FFmpeg(
                     inputs={f"{self._audio_file}": None, f"{self._image_file}": '-loop 1'},
-                    outputs={f"{self._video_file}": '-c:a copy -c:v libx264 -shortest'}
+                    outputs={f"{self._video_file}": '-y -c:a copy -c:v libx264 -shortest'}
             )
             #TODO: use StringObject to redirect output via Variable to text_label
             stdout, stderr = ff.run(stdout=subprocess.PIPE)
